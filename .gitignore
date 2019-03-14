@@ -6,6 +6,10 @@ luac.out
 *.zip
 *.tar.gz
 
+#thirdparty archived files
+/thirdparty/*
+!thirdparty_archived/*.tar.gz
+
 # Object files
 *.o
 *.os
