@@ -13,6 +13,8 @@ function love.keypressed(key)
   tanksGame:processKeyPressed(key)
 end
 
+-- ===========================================================================
+
 function love.load(arg)
   local success = love.window.setMode(appDef.windowWidth, appDef.windowHeight,
                                       {resizable=false})
@@ -23,6 +25,8 @@ function love.load(arg)
   tanksGame = TanksGame(appDef.largeFrameSize, appDef.largeFrameSize,
                         appDef.gameAreaWidth, appDef.gameAreaHeight)
 end
+
+-- ===========================================================================
 
 local function drawLargeBorders()
   -- draw (restore) large borders
@@ -60,7 +64,6 @@ local function drawSmallBorders()
   --
 end
 
-
 function love.draw()
   love.graphics.clear()
 
@@ -69,6 +72,8 @@ function love.draw()
 
   tanksGame:drawSelf()
 end
+
+-- ===========================================================================
 
 function love.update(diffTime)
   tanksGame:processUpdate(diffTime)
