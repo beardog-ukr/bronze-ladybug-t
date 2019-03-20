@@ -22,6 +22,8 @@ function love.load(arg)
     log_m.error("Failed to set window mode")
   end
 
+  love.window.setTitle( "A kind of Tanks game" )
+
   tanksGame = TanksGame(appDef.largeFrameSize, appDef.largeFrameSize,
                         appDef.gameAreaWidth, appDef.gameAreaHeight)
 end
