@@ -10,8 +10,6 @@ TanksGame = BaseKnife:extend()
 local mapLegend = {}
 mapLegend.wall1 = "v"      -- wall with 1 stength level
 mapLegend.wall2 = "w"      -- wall of 2nd strength level
-mapLegend.tankPlayer = "T" -- player tank (TODO will be 
-                            --  replaced by "spawning point"?) 
 mapLegend.space = " "      -- dirt empty place on the map
 
 local keyBindings = {}
@@ -55,9 +53,9 @@ local function loadMap(ctx)
   map[ 4] = {" ","w"," "," "," "," "," "," "," "," "," "," "," "}
   map[ 5] = {" "," "," "," "," "," "," "," "," "," "," "," "," "}
   map[ 6] = {" ","v"," "," "," "," "," "," "," "," "," "," "," "}
-  map[ 7] = {" ","v"," ","T"," "," "," "," "," "," "," "," "," "}
+  map[ 7] = {" ","v"," "," "," "," "," "," "," "," "," "," "," "}
   map[ 8] = {" ","v"," "," "," "," "," "," "," "," "," "," "," "}
-  map[ 9] = {" "," "," ","v","v"," "," "," "," "," "," "," "," "}
+  map[ 9] = {" "," ","w","v","v"," "," "," "," "," "," "," "," "}
   map[10] = {" ","w"," "," "," "," "," "," "," "," "," "," "," "}
   map[11] = {" ","w"," "," "," "," "," "," "," "," "," "," "," "}
   map[12] = {" ","w"," "," "," "," "," "," "," "," "," "," "," "}
@@ -356,6 +354,7 @@ local function performFiring(gameCtx, tankCtx)
   --
   local newBullet = {}
   newBullet.moveProgress = 0
+  newBullet.triggered = false -- bullet will be "triggered" if it meets some obstacle
 
   local cx, cy = getActualCoordinates(tankCtx)
   newBullet.cellX = cx
@@ -449,7 +448,7 @@ local function cleanupBulletsArray(arr)
   local n=#arr
     
   for i=1,n do
-    if (arr[i].moveProgress >0.98) then
+    if (arr[i].moveProgress >0.98) or (arr[i].triggered == true) then
       arr[i]=nil
     end
   end
@@ -467,6 +466,45 @@ local function cleanupBulletsArray(arr)
   end
 end
 
+local function getActualBulletCoordinates(itemCtx)
+  local pm = (itemCtx.finalX - itemCtx.cellX) * itemCtx.moveProgress
+  local cx = itemCtx.cellX + pm
+  local resultX = math.floor(cx + 0.5)
+
+  pm = (itemCtx.finalY - itemCtx.cellY) * itemCtx.moveProgress
+  local cy = itemCtx.cellY + pm
+  local resultY = math.floor(cy + 0.5)
+
+  return resultX, resultY
+end
+
+local function processConflictsBulletsVsWalls(mapArr, bulletsArr)
+  for i=1,#bulletsArr do
+    -- check one bullet
+    local cx, cy = getActualBulletCoordinates(bulletsArr[i])
+    if (cx < 1) or (cx > 13) or (cy < 1) or (cy > 13) then
+      LL.error("Bad cx or cy calculated: " .. cx .. " ; " .. cy)
+      return
+    end
+
+    if (mapArr[cy][cx] ~= mapLegend.space) then
+      LL.debug("Conflict detected: " .. cx .. " ; " .. cy)
+
+      bulletsArr[i].triggered = true
+      if (mapArr[cy][cx] == mapLegend.wall1) then
+        mapArr[cy][cx] = mapLegend.space
+      elseif (mapArr[cy][cx] == mapLegend.wall2) then
+        mapArr[cy][cx] = mapLegend.wall1
+      else
+        LL.error("Bad map value detected: " .. mapArr[cy][cx])
+      end
+
+    end
+  end
+end
+
+-- ===========================================================================
+
 function TanksGame:processUpdate(diffTime)
   if (self.gameInitialized ==nil) then
     return
@@ -480,6 +518,7 @@ function TanksGame:processUpdate(diffTime)
   TimerKnife.update(diffTime)
 
   -- conflicts processing?
+  processConflictsBulletsVsWalls(self.map, self.bullets)
 
   -- 
   cleanupBulletsArray(self.bullets)
