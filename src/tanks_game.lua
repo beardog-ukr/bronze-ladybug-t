@@ -19,6 +19,7 @@ keyBindings.up = "up"
 keyBindings.down = "down"
 keyBindings.left = "left"
 keyBindings.right = "right"
+keyBindings.fire = "space"
 
 local tankDirections = {}
 tankDirections.up =1
@@ -31,8 +32,9 @@ local tankDirectionAngles = {math.pi,
                              math.pi/2, 
                              -math.pi/2} -- for up, down, left,right
 
-local delays = {}
-delays.move = 3
+local delays = {} -- tween length in seconds
+delays.move = 3 
+delays.bullet = delays.move/2
 
 -- ===========================================================================
 
@@ -85,13 +87,16 @@ function TanksGame:constructor(offsetX, offsetY, areaWidth, areaHeight)
   self.gameFinished = false
 
   self.playerTank = {}
-  setupPlayerTank(self.playerTank)  
+  setupPlayerTank(self.playerTank)
+
+  self.bullets = {}
 
   self.images = {}
-  self.images.ground = love.graphics.newImage( "res/img/ground01.png" )
-  self.images.tank = love.graphics.newImage( "res/img/tank01.png" )
-  self.images.wall1 = love.graphics.newImage( "res/img/wall01.png" )
-  self.images.wall2 = love.graphics.newImage( "res/img/wall02.png" )
+  self.images.bullet = love.graphics.newImage("res/img/bullet01.png")
+  self.images.ground = love.graphics.newImage("res/img/ground01.png")
+  self.images.tank = love.graphics.newImage("res/img/tank01.png")
+  self.images.wall1 = love.graphics.newImage("res/img/wall01.png")
+  self.images.wall2 = love.graphics.newImage("res/img/wall02.png")
 
   self.gameInitialized = true
 end
@@ -143,6 +148,39 @@ local function drawWalls(ctx)
   end
 end
 
+local function drawBullets(gameCtx)
+  for i=1, #gameCtx.bullets do
+    local cx = gameCtx.bullets[i].cellX
+    if (gameCtx.bullets[i].cellX ~= gameCtx.bullets[i].finalX) then
+      local pm = (gameCtx.bullets[i].finalX - gameCtx.bullets[i].cellX) 
+      pm = pm * gameCtx.bullets[i].moveProgress
+      cx = cx + pm
+    end
+
+    local centerX = gameCtx.gameAreaX
+    centerX = centerX + (cx-1)*gameCtx.cellSize + gameCtx.cellSize/2
+
+    local cy = gameCtx.bullets[i].cellY
+    if (gameCtx.bullets[i].cellY ~= gameCtx.bullets[i].finalY) then
+      local pm = (gameCtx.bullets[i].finalY - gameCtx.bullets[i].cellY) 
+      pm = pm * gameCtx.bullets[i].moveProgress
+      cy = cy + pm
+    end
+
+    local centerY = gameCtx.gameAreaY
+    centerY = centerY + (cy-1)*gameCtx.cellSize + gameCtx.cellSize/2
+
+    local imgWidth = gameCtx.images.bullet:getWidth()
+    local imgHeight = gameCtx.images.bullet:getHeight()
+  
+    -- LL.trace("cx  is " .. cx .. " cy = " .. cy)
+
+    love.graphics.draw(gameCtx.images.bullet, centerX, centerY, 
+                       tankDirectionAngles[gameCtx.bullets[i].direction], 1,1, 
+                       imgWidth/2, imgHeight/2)
+  end
+end
+
 local function drawTank(gameCtx, tankCtx)  
   local angle = tankDirectionAngles[tankCtx.direction]
 
@@ -175,6 +213,7 @@ function TanksGame:drawSelf()
   drawWalls(self)
 
   drawTank(self, self.playerTank)
+  drawBullets(self)
 end
 
 -- ===========================================================================
@@ -296,6 +335,79 @@ local function processMoveRight(tankCtx, walls)
                    { [tankCtx] = { moveProgress = 1 } }):finish(postRightMove) 
 end
 
+-- ===========================================================================
+
+local function getActualCoordinates(itemCtx)
+  local resultX = itemCtx.cellX
+  local resultY = itemCtx.cellY
+
+  if (itemCtx.moveProgress>=0.5) then
+    if (itemCtx.direction == tankDirections.up) then
+      resultY = resultY -1
+    elseif (itemCtx.direction == tankDirections.down) then
+      resultY = resultY +1
+    end
+  end
+
+  return resultX, resultY
+end
+
+local function performFiring(gameCtx, tankCtx)
+  --
+  local newBullet = {}
+  newBullet.moveProgress = 0
+
+  local cx, cy = getActualCoordinates(tankCtx)
+  newBullet.cellX = cx
+  newBullet.cellY = cy
+  newBullet.finalX = cx
+  newBullet.finalY = cy
+
+  newBullet.direction = tankCtx.direction
+
+  if (newBullet.direction == tankDirections.up) then
+    newBullet.cellY = newBullet.cellY -1
+    newBullet.finalY = 1
+  elseif (newBullet.direction == tankDirections.down) then
+    newBullet.cellY = newBullet.cellY +1
+    newBullet.finalY = 13
+  elseif (newBullet.direction == tankDirections.left) then
+    newBullet.cellX = newBullet.cellX -1
+    newBullet.finalX = 1
+  elseif (newBullet.direction == tankDirections.right) then
+    newBullet.cellX = newBullet.cellX +1
+    newBullet.finalX = 13
+  end
+
+  if (newBullet.cellX <1) or (newBullet.cellX>13) or 
+     (newBullet.cellY <1) or (newBullet.cellY>13) then
+    LL.warn("No shooting at direction " .. newBullet.direction)
+    return
+  end
+
+  local flightLength = 0
+  if (newBullet.cellX ~= newBullet.finalX) then
+    flightLength = delays.bullet* math.abs(newBullet.finalX - newBullet.cellX)
+  elseif (newBullet.cellY ~= newBullet.finalY) then
+    flightLength = delays.bullet* math.abs(newBullet.finalY - newBullet.cellY)
+  end
+  
+  if (flightLength>0) then
+    newBullet.moveTween = TimerKnife.tween(flightLength, 
+                                           { [newBullet] = { moveProgress = 1 } });
+  else
+    newBullet.moveTween = nil
+    newBullet.moveProgress = 1
+    LL.trace("Bullet already at the edge")
+  end
+
+  gameCtx.bullets[#gameCtx.bullets+1] = newBullet
+
+  LL.trace("Firing done")
+end
+
+-- ===========================================================================
+
 local moveKeysProcessors = {processMoveUp, processMoveDown, processMoveLeft, processMoveRight }
 local moveKeys = {keyBindings.up, keyBindings.down, keyBindings.left, keyBindings.right }
 
@@ -312,6 +424,11 @@ function TanksGame:processKeyPressed(key)
     end
   end
 
+  if (key == keyBindings.fire) then
+    LL.trace("Firing")
+    performFiring(self, self.playerTank)
+  end
+
 end
 
 -- ===========================================================================
@@ -322,6 +439,32 @@ local function progressFinished(value)
   else 
     return false 
   end 
+end
+
+-- ===========================================================================
+
+-- removes bullets that reached end of the line
+-- TODO: check efficiency
+local function cleanupBulletsArray(arr)
+  local n=#arr
+    
+  for i=1,n do
+    if (arr[i].moveProgress >0.98) then
+      arr[i]=nil
+    end
+  end
+    
+  local j=0
+  for i=1,n do
+    if arr[i]~=nil then
+      j=j+1
+      arr[j]=arr[i]
+    end
+  end
+  
+  for i=j+1,n do
+    arr[i]=nil
+  end
 end
 
 function TanksGame:processUpdate(diffTime)
@@ -335,5 +478,10 @@ function TanksGame:processUpdate(diffTime)
   -- else
 
   TimerKnife.update(diffTime)
+
+  -- conflicts processing?
+
+  -- 
+  cleanupBulletsArray(self.bullets)
 
 end
