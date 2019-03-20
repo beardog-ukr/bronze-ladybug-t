@@ -11,6 +11,8 @@ local mapLegend = {}
 mapLegend.wall1 = "v"      -- wall with 1 stength level
 mapLegend.wall2 = "w"      -- wall of 2nd strength level
 mapLegend.space = " "      -- dirt empty place on the map
+mapLegend.playerTank = "P" -- start of player tank (should appear once)
+mapLegend.enemyTank = "E" -- start of enemy tank
 
 local keyBindings = {}
 keyBindings.up = "up"
@@ -36,13 +38,59 @@ delays.bullet = delays.move/2
 
 -- ===========================================================================
 
-function setupPlayerTank(ctx)
-  ctx.cellX =3
-  ctx.cellY =6
-  ctx.direction = tankDirections.down
+function setupPlayerTank(ctx, map)
+  local startingPointFound = false
+  -- load position from map
+  for i=1, #map do
+    for j=1, #map[i] do
+      if map[i][j] == mapLegend.playerTank then
+        ctx.cellX = j
+        ctx.cellY = i
+        map[i][j] = mapLegend.space
+        startingPointFound = true
+        break
+      end
+    end
 
+    if (startingPointFound) then
+      break
+    end
+  end
+
+  if (startingPointFound ==false) then
+    LL.warn("Will use default values for player start position")
+    ctx.cellX =3 
+    ctx.cellY =6
+  end
+
+  ctx.direction = tankDirections.down
   ctx.moveProgress = 0
 end
+
+-- ===========================================================================
+
+local function setupOneEnemy(ctx, cx, cy)
+  ctx.cellX = cx
+  ctx.cellY = cy
+
+  ctx.direction = tankDirections.down
+  ctx.moveProgress = 0
+  ctx.disabled = false
+end
+
+local function setupEnemies(itemsArr, map)
+  for i=1, #map do
+    for j=1, #map[i] do
+      if map[i][j] == mapLegend.enemyTank then
+        local newItem = {}
+        setupOneEnemy(newItem, j,i)
+        itemsArr[#itemsArr+1] = newItem
+        map[i][j] = mapLegend.space
+      end
+    end
+  end
+end
+
 -- ===========================================================================
 
 local function loadMap(ctx)
@@ -52,12 +100,12 @@ local function loadMap(ctx)
   map[ 3] = {" ","w"," ","w","w"," "," "," "," "," "," "," "," "}
   map[ 4] = {" ","w"," "," "," "," "," "," "," "," "," "," "," "}
   map[ 5] = {" "," "," "," "," "," "," "," "," "," "," "," "," "}
-  map[ 6] = {" ","v"," "," "," "," "," "," "," "," "," "," "," "}
+  map[ 6] = {" ","v"," ","P"," "," "," ","E"," "," ","E"," "," "}
   map[ 7] = {" ","v"," "," "," "," "," "," "," "," "," "," "," "}
   map[ 8] = {" ","v"," "," "," "," "," "," "," "," "," "," "," "}
   map[ 9] = {" "," ","w","v","v"," "," "," "," "," "," "," "," "}
   map[10] = {" ","w"," "," "," "," "," "," "," "," "," "," "," "}
-  map[11] = {" ","w"," "," "," "," "," "," "," "," "," "," "," "}
+  map[11] = {" ","w"," ","E"," "," "," "," "," "," "," "," "," "}
   map[12] = {" ","w"," "," "," "," "," "," "," "," "," "," "," "}
   map[13] = {" "," "," "," "," "," "," "," "," "," "," "," "," "}
    
@@ -85,7 +133,10 @@ function TanksGame:constructor(offsetX, offsetY, areaWidth, areaHeight)
   self.gameFinished = false
 
   self.playerTank = {}
-  setupPlayerTank(self.playerTank)
+  setupPlayerTank(self.playerTank, self.map)
+
+  self.enemies = {}
+  setupEnemies(self.enemies, self.map)
 
   self.bullets = {}
 
@@ -93,6 +144,7 @@ function TanksGame:constructor(offsetX, offsetY, areaWidth, areaHeight)
   self.images.bullet = love.graphics.newImage("res/img/bullet01.png")
   self.images.ground = love.graphics.newImage("res/img/ground01.png")
   self.images.tank = love.graphics.newImage("res/img/tank01.png")
+  self.images.enemy = love.graphics.newImage("res/img/tank02.png")
   self.images.wall1 = love.graphics.newImage("res/img/wall01.png")
   self.images.wall2 = love.graphics.newImage("res/img/wall02.png")
 
@@ -206,11 +258,48 @@ local function drawTank(gameCtx, tankCtx)
                      imgWidth/2, imgHeight/2) 
 end
 
+local function drawOneEnemy(gameCtx, tankCtx)
+  local angle = tankDirectionAngles[tankCtx.direction]
+
+  local centerX = gameCtx.gameAreaX
+  centerX = centerX + (tankCtx.cellX-1)*gameCtx.cellSize + gameCtx.cellSize/2
+
+  local centerY = gameCtx.gameAreaY
+  centerY = centerY + (tankCtx.cellY-1)*gameCtx.cellSize + gameCtx.cellSize/2
+
+  -- local moveProgressModifier = (tankCtx.moveProgress*gameCtx.cellSize)
+  -- if (tankCtx.direction == tankDirections.left) then
+  --   centerX = centerX - moveProgressModifier
+  -- elseif (tankCtx.direction == tankDirections.right) then
+  --   centerX = centerX + moveProgressModifier
+  -- elseif (tankCtx.direction == tankDirections.up) then
+  --   centerY = centerY - moveProgressModifier
+  -- elseif (tankCtx.direction == tankDirections.down) then
+  --   centerY = centerY + moveProgressModifier
+  -- end
+
+  local imgWidth = gameCtx.images.tank:getWidth()
+  local imgHeight = gameCtx.images.tank:getHeight()
+
+  love.graphics.draw(gameCtx.images.enemy, centerX, centerY, angle, 1,1,
+                     imgWidth/2, imgHeight/2) 
+end
+
+local function drawEnemies(gameCtx, enemiesArr)
+  for i=1,#enemiesArr do
+    if (enemiesArr[i].disabled == false) then
+      drawOneEnemy(gameCtx, enemiesArr[i])
+    end
+  end
+end
+
 function TanksGame:drawSelf()
   drawBackground(self)
   drawWalls(self)
 
   drawTank(self, self.playerTank)
+  drawEnemies(self, self.enemies)
+
   drawBullets(self)
 end
 
@@ -335,7 +424,7 @@ end
 
 -- ===========================================================================
 
-local function getActualCoordinates(itemCtx)
+local function getActualTankCoordinates(itemCtx)
   local resultX = itemCtx.cellX
   local resultY = itemCtx.cellY
 
@@ -356,7 +445,7 @@ local function performFiring(gameCtx, tankCtx)
   newBullet.moveProgress = 0
   newBullet.triggered = false -- bullet will be "triggered" if it meets some obstacle
 
-  local cx, cy = getActualCoordinates(tankCtx)
+  local cx, cy = getActualTankCoordinates(tankCtx)
   newBullet.cellX = cx
   newBullet.cellY = cy
   newBullet.finalX = cx
@@ -416,6 +505,11 @@ function TanksGame:processKeyPressed(key)
     return;
   end;
 
+  if self.gameFinished then
+    LL.debug("Game over, ignoring " .. key)
+    return
+  end
+
   for i=1, #moveKeys do
     if (moveKeys[i] == key) then
       moveKeysProcessors[i](self.playerTank, self.map)
@@ -449,6 +543,31 @@ local function cleanupBulletsArray(arr)
     
   for i=1,n do
     if (arr[i].moveProgress >0.98) or (arr[i].triggered == true) then
+      arr[i]=nil
+    end
+  end
+    
+  local j=0
+  for i=1,n do
+    if arr[i]~=nil then
+      j=j+1
+      arr[j]=arr[i]
+    end
+  end
+  
+  for i=j+1,n do
+    arr[i]=nil
+  end
+end
+
+-- removes bullets that reached end of the line
+-- TODO: check efficiency
+-- TODO: duplicates cleanupBulletsArray function
+local function cleanupEnemiesArray(arr)
+  local n=#arr
+    
+  for i=1,n do
+    if (arr[i].disabled == true) then
       arr[i]=nil
     end
   end
@@ -505,6 +624,43 @@ end
 
 -- ===========================================================================
 
+-- returns true if conflict detected (game should be over with it)
+--         false othervice
+local function processConflictsTankVsEnemies(tankCtx, enemiesArr)
+  local result = false
+  local tx, ty = getActualTankCoordinates(tankCtx)
+  for i=1,#enemiesArr do
+    local ex, ey = getActualTankCoordinates(enemiesArr[i])
+    if (ex == tx) and (ey == ty) then
+      result = true
+      LL.debug("found conflict at " .. ex .. ":" .. ey)
+      break;
+    end
+  end
+
+  return result
+end
+
+local function processConflictsBulletsVsEnemies(bulletsArr, enemiesArr)
+  for i=1,#bulletsArr do
+    local bx, by = getActualBulletCoordinates(bulletsArr[i])
+
+    for j=1,#enemiesArr do
+      local ex,ey = getActualTankCoordinates(enemiesArr[j])
+
+      if (bx == ex) and (by == ey) then
+        LL.debug("Killing some: " .. ex .. " ; " .. ey)
+        bulletsArr[i].triggered = true
+        enemiesArr[j].disabled = true
+        break
+      end  
+    end
+
+  end
+end
+
+-- ===========================================================================
+
 function TanksGame:processUpdate(diffTime)
   if (self.gameInitialized ==nil) then
     return
@@ -518,6 +674,18 @@ function TanksGame:processUpdate(diffTime)
   TimerKnife.update(diffTime)
 
   -- conflicts processing?
+
+
+  self.gameFinished =  processConflictsTankVsEnemies(self.playerTank, self.enemies)
+  if (self.gameFinished) then
+    LL.debug("hahah, game over")
+    return
+  end
+
+  processConflictsBulletsVsEnemies(self.bullets, self.enemies)
+  cleanupBulletsArray(self.bullets)
+  cleanupEnemiesArray(self.enemies)
+
   processConflictsBulletsVsWalls(self.map, self.bullets)
 
   -- 
