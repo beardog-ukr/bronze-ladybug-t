@@ -5,7 +5,20 @@ local TimerKnife = require '../thirdparty/knife.timer'
 
 TanksGame = BaseKnife:extend()
 
+require "src/wall_object"
+
+local settings_m = require("src/app_defaults")
+local appDef = {}
+settings_m.setupAppDefaults(appDef)
+
 -- ===========================================================================
+
+local drawSettings = {}
+drawSettings.gameAreaX = appDef.largeFrameSize
+drawSettings.gameAreaY = appDef.largeFrameSize
+drawSettings.cellSize = appDef.cellSize
+drawSettings.cellsCount = 13
+
 
 local mapLegend = {}
 mapLegend.wall1 = "v"      -- wall with 1 stength level
@@ -93,23 +106,29 @@ end
 
 -- ===========================================================================
 
-local function loadMap(ctx)
+local function loadMap(walls)
   local map = {}
   map[ 1] = {" "," "," "," "," "," "," "," "," "," "," "," "," "}
   map[ 2] = {" ","w"," "," "," "," "," "," "," "," "," "," "," "}
   map[ 3] = {" ","w"," ","w","w"," "," "," "," "," "," "," "," "}
   map[ 4] = {" ","w"," "," "," "," "," "," "," "," "," "," "," "}
   map[ 5] = {" "," "," "," "," "," "," "," "," "," "," "," "," "}
-  map[ 6] = {" ","v"," ","P"," "," "," ","E"," "," "," "," "," "}
+  map[ 6] = {" ","v"," "," "," "," "," "," "," "," "," "," "," "}
   map[ 7] = {" ","v"," "," "," "," "," "," "," "," "," "," "," "}
   map[ 8] = {" ","v"," "," "," "," "," ","v"," "," "," "," "," "}
   map[ 9] = {" "," ","w","v","v"," "," "," "," "," "," "," "," "}
   map[10] = {" ","w"," "," "," "," "," "," "," "," "," "," "," "}
-  map[11] = {" ","w"," ","E"," "," "," "," "," "," "," "," "," "}
+  map[11] = {" ","w"," "," "," "," "," "," "," "," "," "," "," "}
   map[12] = {" ","w"," "," "," "," "," "," "," "," "," "," "," "}
   map[13] = {" "," "," "," "," "," "," "," "," "," "," "," "," "}
    
-  ctx.map = map
+  for i=1,#map do
+    for j=1,#map[i] do
+      if (map[i][j] ~= " ") then
+        walls[#walls +1] = WallObject(j,i, map[i][j])
+      end
+    end
+  end
 end
 
 local function setGameArea(ctx, offsetX, offsetY, areaWidth, areaHeight)
@@ -128,72 +147,68 @@ function TanksGame:constructor(offsetX, offsetY, areaWidth, areaHeight)
 
   setGameArea(self, offsetX, offsetY, areaWidth, areaHeight)
   
-  loadMap(self)
+  self.walls = {}
+  loadMap(self.walls)
 
   self.gameFinished = false
 
-  self.playerTank = {}
-  setupPlayerTank(self.playerTank, self.map)
+  -- self.playerTank = {}
+  -- setupPlayerTank(self.playerTank, self.map)
 
-  self.enemies = {}
-  setupEnemies(self.enemies, self.map)
+  -- self.enemies = {}
+  -- setupEnemies(self.enemies, self.map)
 
-  self.bullets = {}
+  -- self.bullets = {}
 
   self.images = {}
-  self.images.bullet = love.graphics.newImage("res/img/bullet01.png")
-  self.images.ground = love.graphics.newImage("res/img/ground01.png")
-  self.images.tank = love.graphics.newImage("res/img/tank01.png")
-  self.images.enemy = love.graphics.newImage("res/img/tank02.png")
-  self.images.wall1 = love.graphics.newImage("res/img/wall01.png")
-  self.images.wall2 = love.graphics.newImage("res/img/wall02.png")
+  self.images[1] = love.graphics.newImage("res/img/wall01.png")
+  self.images[2] = love.graphics.newImage("res/img/wall02.png")
+  self.images[5] = love.graphics.newImage("res/img/ground01.png")
+  -- self.images.bullet = love.graphics.newImage("res/img/bullet01.png")
+  -- self.images.ground = love.graphics.newImage("res/img/ground01.png")
+  -- self.images.tank = love.graphics.newImage("res/img/tank01.png")
+  -- self.images.enemy = love.graphics.newImage("res/img/tank02.png")
+  -- self.images.wall1 = love.graphics.newImage("res/img/wall01.png")
+  -- self.images.wall2 = love.graphics.newImage("res/img/wall02.png")
 
   self.gameInitialized = true
 end
 
 -- ===========================================================================
 
-local function drawBackground(ctx)
+local function drawBackground(image)
   love.graphics.setColor(1,1,1,1)
-  for i=1,#ctx.map do
-    for j=1, #ctx.map[i] do
-      local rx = ctx.gameAreaX + (i-1)*ctx.cellSize
-      local ry = ctx.gameAreaY + (j-1)*ctx.cellSize
-      love.graphics.draw( ctx.images.ground, rx, ry)
+  for i=1,drawSettings.cellsCount do
+    for j=1,drawSettings.cellsCount do
+      local rx = drawSettings.gameAreaX + (i-1)*drawSettings.cellSize
+      local ry = drawSettings.gameAreaY + (j-1)*drawSettings.cellSize
+      love.graphics.draw( image, rx, ry)
     end
   end
 end
 
-local function drawImageInCell(img, cellX, cellY, angle, 
-                               baseX, baseY, cellSize)
+local function drawImageInCell(img, cellX, cellY, angle)
   local imgWidth = img:getWidth()
   local imgHeight = img:getHeight()
 
-  local centerX = baseX + (cellX-1)*cellSize + cellSize/2
-  local centerY = baseY + (cellY-1)*cellSize + cellSize/2
+  local centerX = (cellX-1)*drawSettings.cellSize + drawSettings.cellSize/2
+  centerX = centerX + drawSettings.gameAreaX
+
+  local centerY = (cellY-1)*drawSettings.cellSize + drawSettings.cellSize/2
+  centerY = centerY + drawSettings.gameAreaY
 
   love.graphics.draw(img, centerX, centerY, angle, 1,1, imgWidth/2, imgHeight/2)
 end
 
-local function drawWalls(ctx)
+local function drawWalls(images, walls)
   love.graphics.setColor(1,1,1,1)
 
-  for i=1,#ctx.map do
-    for j=1, #ctx.map[i] do
-      if (ctx.map[i][j] ~= mapLegend.space) then
-        local wallImg = nil;
-        if (ctx.map[i][j] == mapLegend.wall1) then
-          wallImg = ctx.images.wall1
-        elseif (ctx.map[i][j] == mapLegend.wall2) then
-          wallImg = ctx.images.wall2
-        end
-
-        if (wallImg) then
-          drawImageInCell(wallImg, j,i, 0,
-                          ctx.gameAreaX, ctx.gameAreaX, ctx.cellSize)
-        end
-      end
-      
+  for i=1, #walls do
+    local wx, wy = walls[i]:getCellCoordinates()
+    -- print("Coords: " .. wx .. " : " .. wy)
+    local imgId = walls[i]:getImageId()
+    if (imgId) and (images[imgId]) then
+      drawImageInCell(images[imgId], wx, wy, 0)
     end
   end
 end
@@ -294,13 +309,13 @@ local function drawEnemies(gameCtx, enemiesArr)
 end
 
 function TanksGame:drawSelf()
-  drawBackground(self)
-  drawWalls(self)
+  drawBackground(self.images[5])
+  drawWalls(self.images, self.walls)
 
-  drawTank(self, self.playerTank)
-  drawEnemies(self, self.enemies)
+  -- drawTank(self, self.playerTank)
+  -- drawEnemies(self, self.enemies)
 
-  drawBullets(self)
+  -- drawBullets(self)
 end
 
 -- ===========================================================================
@@ -531,17 +546,17 @@ function TanksGame:processKeyPressed(key)
     return
   end
 
-  for i=1, #moveKeys do
-    if (moveKeys[i] == key) then
-      moveKeysProcessors[i](self.playerTank, self.map)
-      return
-    end
-  end
+  -- for i=1, #moveKeys do
+  --   if (moveKeys[i] == key) then
+  --     moveKeysProcessors[i](self.playerTank, self.map)
+  --     return
+  --   end
+  -- end
 
-  if (key == keyBindings.fire) then
-    LL.trace("Firing")
-    performFiring(self.bullets, self.playerTank)
-  end
+  -- if (key == keyBindings.fire) then
+  --   LL.trace("Firing")
+  --   performFiring(self.bullets, self.playerTank)
+  -- end
 
 end
 
@@ -821,29 +836,29 @@ function TanksGame:processUpdate(diffTime)
   end
   -- else
 
-  TimerKnife.update(diffTime)
+  -- TimerKnife.update(diffTime)
 
-  setupEnemyMoves(self.map, self.playerTank, self.enemies, self.bullets)
+  -- setupEnemyMoves(self.map, self.playerTank, self.enemies, self.bullets)
 
   -- conflicts processing
-  self.gameFinished = processConflictsTankVsEnemies(self.playerTank, self.enemies)
-  if (self.gameFinished) then
-    LL.debug("hahah, game over")
-    return
-  end
+  -- self.gameFinished = processConflictsTankVsEnemies(self.playerTank, self.enemies)
+  -- if (self.gameFinished) then
+  --   LL.debug("hahah, game over")
+  --   return
+  -- end
 
-  self.gameFinished = processConflictsBulletsVsPlayer(self.bullets, self.playerTank)
-  if (self.gameFinished) then
-    cleanupBulletsArray(self.bullets)
-    LL.debug("hahah, game over, player killed")
-    return
-  end  
+  -- self.gameFinished = processConflictsBulletsVsPlayer(self.bullets, self.playerTank)
+  -- if (self.gameFinished) then
+  --   cleanupBulletsArray(self.bullets)
+  --   LL.debug("hahah, game over, player killed")
+  --   return
+  -- end  
 
-  processConflictsBulletsVsEnemies(self.bullets, self.enemies)
-  cleanupBulletsArray(self.bullets)
-  cleanupEnemiesArray(self.enemies)
+  -- processConflictsBulletsVsEnemies(self.bullets, self.enemies)
+  -- cleanupBulletsArray(self.bullets)
+  -- cleanupEnemiesArray(self.enemies)
 
-  processConflictsBulletsVsWalls(self.map, self.bullets)
-  cleanupBulletsArray(self.bullets)
+  -- processConflictsBulletsVsWalls(self.map, self.bullets)
+  -- cleanupBulletsArray(self.bullets)
 
 end
