@@ -100,12 +100,12 @@ local function loadMap(ctx)
   map[ 3] = {" ","w"," ","w","w"," "," "," "," "," "," "," "," "}
   map[ 4] = {" ","w"," "," "," "," "," "," "," "," "," "," "," "}
   map[ 5] = {" "," "," "," "," "," "," "," "," "," "," "," "," "}
-  map[ 6] = {" ","v"," ","P"," "," "," ","E"," "," ","E"," "," "}
+  map[ 6] = {" ","v"," ","P"," "," "," ","E"," "," "," "," "," "}
   map[ 7] = {" ","v"," "," "," "," "," "," "," "," "," "," "," "}
   map[ 8] = {" ","v"," "," "," "," "," "," "," "," "," "," "," "}
   map[ 9] = {" "," ","w","v","v"," "," "," "," "," "," "," "," "}
   map[10] = {" ","w"," "," "," "," "," "," "," "," "," "," "," "}
-  map[11] = {" ","w"," ","E"," "," "," "," "," "," "," "," "," "}
+  map[11] = {" ","w"," "," "," "," "," "," "," "," "," "," "," "}
   map[12] = {" ","w"," "," "," "," "," "," "," "," "," "," "," "}
   map[13] = {" "," "," "," "," "," "," "," "," "," "," "," "," "}
    
@@ -267,16 +267,16 @@ local function drawOneEnemy(gameCtx, tankCtx)
   local centerY = gameCtx.gameAreaY
   centerY = centerY + (tankCtx.cellY-1)*gameCtx.cellSize + gameCtx.cellSize/2
 
-  -- local moveProgressModifier = (tankCtx.moveProgress*gameCtx.cellSize)
-  -- if (tankCtx.direction == tankDirections.left) then
-  --   centerX = centerX - moveProgressModifier
-  -- elseif (tankCtx.direction == tankDirections.right) then
-  --   centerX = centerX + moveProgressModifier
-  -- elseif (tankCtx.direction == tankDirections.up) then
-  --   centerY = centerY - moveProgressModifier
-  -- elseif (tankCtx.direction == tankDirections.down) then
-  --   centerY = centerY + moveProgressModifier
-  -- end
+  local moveProgressModifier = (tankCtx.moveProgress*gameCtx.cellSize)
+  if (tankCtx.direction == tankDirections.left) then
+    centerX = centerX - moveProgressModifier
+  elseif (tankCtx.direction == tankDirections.right) then
+    centerX = centerX + moveProgressModifier
+  elseif (tankCtx.direction == tankDirections.up) then
+    centerY = centerY - moveProgressModifier
+  elseif (tankCtx.direction == tankDirections.down) then
+    centerY = centerY + moveProgressModifier
+  end
 
   local imgWidth = gameCtx.images.tank:getWidth()
   local imgHeight = gameCtx.images.tank:getHeight()
@@ -661,6 +661,84 @@ end
 
 -- ===========================================================================
 
+local function setupEnemyMoveUp(tankCtx, walls)
+  if (tankCtx.cellY == 1) then -- TODO: use game ctx const
+    LL.debug("Enemy already at max north")
+    return
+  end
+
+  if (walls[tankCtx.cellY-1][tankCtx.cellX] ~= mapLegend.space) then
+    LL.debug("Wall at north from enemy, no way")
+    return
+  end
+
+  local function postEnemyDownMove()
+    LL.debug("Enemy one move to north finished")
+    tankCtx.moveProgress=0    
+    tankCtx.cellY = tankCtx.cellY -1
+  end
+
+  tankCtx.direction = tankDirections.up
+  TimerKnife.tween(delays.move, 
+                   { [tankCtx] = { moveProgress = 1 } }):finish(postEnemyDownMove) 
+end
+
+local function setupEnemyMoveDown(tankCtx, walls)
+  if (tankCtx.cellY == 13) then -- TODO: use game ctx const
+    LL.debug("Enemy already at max south")
+    return
+  end
+
+  if (walls[tankCtx.cellY+1][tankCtx.cellX] ~= mapLegend.space) then
+    LL.debug("Wall at south from enemy, no way")
+    return
+  end
+
+  local function postEnemyDownMove()
+    LL.debug("Enemy one move to south finished")
+    tankCtx.moveProgress=0    
+    tankCtx.cellY = tankCtx.cellY +1
+  end
+
+  tankCtx.direction = tankDirections.down
+  TimerKnife.tween(delays.move, 
+                   { [tankCtx] = { moveProgress = 1 } }):finish(postEnemyDownMove) 
+end
+
+local function setupEnemyMoveLeft(tankCtx, walls)
+  if (tankCtx.cellX == 1) then
+    LL.debug("Enemy already at max east")
+    return
+  end
+
+  if (walls[tankCtx.cellY][tankCtx.cellX-1] ~= mapLegend.space) then
+    LL.debug("Wall at east from enemy, no way")
+    return
+  end
+
+  local function postEnemyDownMove()
+    LL.debug("Enemy one move to east finished")
+    tankCtx.moveProgress=0    
+    tankCtx.cellY = tankCtx.cellX -1
+  end
+
+  tankCtx.direction = tankDirections.left
+  TimerKnife.tween(delays.move, 
+                   { [tankCtx] = { moveProgress = 1 } }):finish(postEnemyDownMove) 
+end
+
+
+local function setupEnemyMoves(mapArr, tankCtx, enemiesArr)
+  --
+  for i=1, #enemiesArr do
+    if (enemiesArr[i].moveProgress == 0) then      
+      setupEnemyMoveUp(enemiesArr[i], mapArr)
+    end
+  end
+end
+
+-- ===========================================================================
+
 function TanksGame:processUpdate(diffTime)
   if (self.gameInitialized ==nil) then
     return
@@ -673,9 +751,9 @@ function TanksGame:processUpdate(diffTime)
 
   TimerKnife.update(diffTime)
 
-  -- conflicts processing?
+  setupEnemyMoves(self.map, self.playerTank, self.enemies)
 
-
+  -- conflicts processing
   self.gameFinished =  processConflictsTankVsEnemies(self.playerTank, self.enemies)
   if (self.gameFinished) then
     LL.debug("hahah, game over")
@@ -687,8 +765,6 @@ function TanksGame:processUpdate(diffTime)
   cleanupEnemiesArray(self.enemies)
 
   processConflictsBulletsVsWalls(self.map, self.bullets)
-
-  -- 
   cleanupBulletsArray(self.bullets)
 
 end
