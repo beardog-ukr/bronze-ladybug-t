@@ -459,7 +459,7 @@ local function getActualTankCoordinates(itemCtx)
   return resultX, resultY
 end
 
-local function performFiring(gameCtx, tankCtx)
+local function performFiring(bulletsArr, tankCtx)
   --
   local newBullet = {}
   newBullet.moveProgress = 0
@@ -509,7 +509,8 @@ local function performFiring(gameCtx, tankCtx)
     LL.trace("Bullet already at the edge")
   end
 
-  gameCtx.bullets[#gameCtx.bullets+1] = newBullet
+  -- gameCtx.bullets[#gameCtx.bullets+1] = newBullet
+  bulletsArr[#bulletsArr +1] = newBullet
 
   LL.trace("Firing done")
 end
@@ -539,7 +540,7 @@ function TanksGame:processKeyPressed(key)
 
   if (key == keyBindings.fire) then
     LL.trace("Firing")
-    performFiring(self, self.playerTank)
+    performFiring(self.bullets, self.playerTank)
   end
 
 end
@@ -681,6 +682,28 @@ end
 
 -- ===========================================================================
 
+-- returns true if one of the byllets hits player tank
+--         false othervice
+local function processConflictsBulletsVsPlayer(bulletsArr, tankCtx)
+  local result = false
+
+  local tx,ty = getActualTankCoordinates(tankCtx)
+
+  for i=1,#bulletsArr do
+    local bx, by = getActualBulletCoordinates(bulletsArr[i])
+
+    if (bx == tx) and (by == ty) then
+      result = true
+      bulletsArr[i].triggered = true
+      break
+    end
+  end
+
+  return result
+end
+
+-- ===========================================================================
+
 local function setupEnemyMoveUp(tankCtx, walls)
   if (tankCtx.cellY == 1) then -- TODO: use game ctx const
     LL.debug("Enemy already at max north")
@@ -769,7 +792,7 @@ local function setupEnemyMoveRight(tankCtx, walls)
                    { [tankCtx] = { moveProgress = 1 } }):finish(postEnemyRightMove) 
 end
 
-local function setupEnemyMoves(mapArr, tankCtx, enemiesArr)
+local function setupEnemyMoves(mapArr, tankCtx, enemiesArr, bulletsArr)
   --
   local moves = {setupEnemyMoveUp, setupEnemyMoveDown,
                  setupEnemyMoveLeft, setupEnemyMoveRight}
@@ -778,6 +801,10 @@ local function setupEnemyMoves(mapArr, tankCtx, enemiesArr)
     if (enemiesArr[i].moveProgress == 0) then
       local moveIdx = love.math.random( 1, 4 )
       moves[moveIdx](enemiesArr[i], mapArr)
+      if (enemiesArr[i].cellX == tankCtx.cellX) or
+         (enemiesArr[i].cellY == tankCtx.cellY) then
+        performFiring(bulletsArr, enemiesArr[i])
+      end
     end
   end
 end
@@ -796,14 +823,21 @@ function TanksGame:processUpdate(diffTime)
 
   TimerKnife.update(diffTime)
 
-  setupEnemyMoves(self.map, self.playerTank, self.enemies)
+  setupEnemyMoves(self.map, self.playerTank, self.enemies, self.bullets)
 
   -- conflicts processing
-  self.gameFinished =  processConflictsTankVsEnemies(self.playerTank, self.enemies)
+  self.gameFinished = processConflictsTankVsEnemies(self.playerTank, self.enemies)
   if (self.gameFinished) then
     LL.debug("hahah, game over")
     return
   end
+
+  self.gameFinished = processConflictsBulletsVsPlayer(self.bullets, self.playerTank)
+  if (self.gameFinished) then
+    cleanupBulletsArray(self.bullets)
+    LL.debug("hahah, game over, player killed")
+    return
+  end  
 
   processConflictsBulletsVsEnemies(self.bullets, self.enemies)
   cleanupBulletsArray(self.bullets)
