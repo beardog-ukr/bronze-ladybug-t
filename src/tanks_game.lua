@@ -102,10 +102,10 @@ local function loadMap(ctx)
   map[ 5] = {" "," "," "," "," "," "," "," "," "," "," "," "," "}
   map[ 6] = {" ","v"," ","P"," "," "," ","E"," "," "," "," "," "}
   map[ 7] = {" ","v"," "," "," "," "," "," "," "," "," "," "," "}
-  map[ 8] = {" ","v"," "," "," "," "," "," "," "," "," "," "," "}
+  map[ 8] = {" ","v"," "," "," "," "," ","v"," "," "," "," "," "}
   map[ 9] = {" "," ","w","v","v"," "," "," "," "," "," "," "," "}
   map[10] = {" ","w"," "," "," "," "," "," "," "," "," "," "," "}
-  map[11] = {" ","w"," "," "," "," "," "," "," "," "," "," "," "}
+  map[11] = {" ","w"," ","E"," "," "," "," "," "," "," "," "," "}
   map[12] = {" ","w"," "," "," "," "," "," "," "," "," "," "," "}
   map[13] = {" "," "," "," "," "," "," "," "," "," "," "," "," "}
    
@@ -433,7 +433,27 @@ local function getActualTankCoordinates(itemCtx)
       resultY = resultY -1
     elseif (itemCtx.direction == tankDirections.down) then
       resultY = resultY +1
+    elseif (itemCtx.direction == tankDirections.left) then
+      resultX = resultX -1
+    elseif (itemCtx.direction == tankDirections.down) then
+      resultX = resultX +1
     end
+  end
+
+  if (resultX<1) then
+    resultX = 1
+  end
+
+  if (resultX>13) then
+    resultX = 13
+  end
+
+  if (resultY<1) then
+    resultY = 1
+  end
+
+  if (resultY>13) then
+    resultY = 13
   end
 
   return resultX, resultY
@@ -707,32 +727,57 @@ end
 
 local function setupEnemyMoveLeft(tankCtx, walls)
   if (tankCtx.cellX == 1) then
-    LL.debug("Enemy already at max east")
+    LL.debug("Enemy already at max west")
     return
   end
 
   if (walls[tankCtx.cellY][tankCtx.cellX-1] ~= mapLegend.space) then
-    LL.debug("Wall at east from enemy, no way")
+    LL.debug("Wall at west from enemy, no way")
     return
   end
 
-  local function postEnemyDownMove()
-    LL.debug("Enemy one move to east finished")
+  local function postEnemyLeftMove()
+    LL.debug("Enemy one move to west finished")
     tankCtx.moveProgress=0    
-    tankCtx.cellY = tankCtx.cellX -1
+    tankCtx.cellX = tankCtx.cellX -1
   end
 
   tankCtx.direction = tankDirections.left
   TimerKnife.tween(delays.move, 
-                   { [tankCtx] = { moveProgress = 1 } }):finish(postEnemyDownMove) 
+                   { [tankCtx] = { moveProgress = 1 } }):finish(postEnemyLeftMove) 
 end
 
+local function setupEnemyMoveRight(tankCtx, walls)
+  if (tankCtx.cellX == 13) then
+    LL.debug("Enemy already at max east")
+    return
+  end
+
+  if (walls[tankCtx.cellY][tankCtx.cellX+1] ~= mapLegend.space) then
+    LL.debug("Wall at east from enemy, no way")
+    return
+  end
+
+  local function postEnemyRightMove()
+    LL.debug("Enemy one move to east finished")
+    tankCtx.moveProgress=0    
+    tankCtx.cellX = tankCtx.cellX +1
+  end
+
+  tankCtx.direction = tankDirections.right
+  TimerKnife.tween(delays.move, 
+                   { [tankCtx] = { moveProgress = 1 } }):finish(postEnemyRightMove) 
+end
 
 local function setupEnemyMoves(mapArr, tankCtx, enemiesArr)
   --
+  local moves = {setupEnemyMoveUp, setupEnemyMoveDown,
+                 setupEnemyMoveLeft, setupEnemyMoveRight}
+
   for i=1, #enemiesArr do
-    if (enemiesArr[i].moveProgress == 0) then      
-      setupEnemyMoveUp(enemiesArr[i], mapArr)
+    if (enemiesArr[i].moveProgress == 0) then
+      local moveIdx = love.math.random( 1, 4 )
+      moves[moveIdx](enemiesArr[i], mapArr)
     end
   end
 end
