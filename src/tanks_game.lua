@@ -6,6 +6,7 @@ local TimerKnife = require '../thirdparty/knife.timer'
 TanksGame = BaseKnife:extend()
 
 require "src/wall_object"
+require "src/player_tank_object"
 
 local settings_m = require("src/app_defaults")
 local appDef = {}
@@ -33,17 +34,6 @@ keyBindings.down = "down"
 keyBindings.left = "left"
 keyBindings.right = "right"
 keyBindings.fire = "space"
-
-local tankDirections = {}
-tankDirections.up =1
-tankDirections.down =2
-tankDirections.left =3
-tankDirections.right =4
-
-local tankDirectionAngles = {math.pi, 
-                             0, 
-                             math.pi/2, 
-                             -math.pi/2} -- for up, down, left,right
 
 local delays = {} -- tween length in seconds
 delays.move = 3 
@@ -152,7 +142,9 @@ function TanksGame:constructor(offsetX, offsetY, areaWidth, areaHeight)
 
   self.gameFinished = false
 
-  -- self.playerTank = {}
+  local tankX = 5
+  local tankY = 8
+  self.playerTank = PlayerTankObject(tankX, tankY)
   -- setupPlayerTank(self.playerTank, self.map)
 
   -- self.enemies = {}
@@ -164,10 +156,13 @@ function TanksGame:constructor(offsetX, offsetY, areaWidth, areaHeight)
   self.images[1] = love.graphics.newImage("res/img/wall01.png")
   self.images[2] = love.graphics.newImage("res/img/wall02.png")
   self.images[5] = love.graphics.newImage("res/img/ground01.png")
+
+  self.images[10] = love.graphics.newImage("res/img/tank01.png")
+
   -- self.images.bullet = love.graphics.newImage("res/img/bullet01.png")
   -- self.images.ground = love.graphics.newImage("res/img/ground01.png")
   -- self.images.tank = love.graphics.newImage("res/img/tank01.png")
-  -- self.images.enemy = love.graphics.newImage("res/img/tank02.png")
+  
   -- self.images.wall1 = love.graphics.newImage("res/img/wall01.png")
   -- self.images.wall2 = love.graphics.newImage("res/img/wall02.png")
 
@@ -213,6 +208,37 @@ local function drawWalls(images, walls)
   end
 end
 
+local function drawTank(images, tank)  
+  local angle = tank:getAngle()
+  local tx, ty = tank:getDrawCoordinates()
+   
+
+  local centerX = drawSettings.gameAreaX
+  centerX = centerX + (tx-1)*drawSettings.cellSize + drawSettings.cellSize/2
+
+  local centerY = drawSettings.gameAreaY
+  centerY = centerY + (ty-1)*drawSettings.cellSize + drawSettings.cellSize/2
+
+  -- local moveProgressModifier = (tankCtx.moveProgress*gameCtx.cellSize)
+  -- if (tankCtx.direction == tankDirections.left) then
+  --   centerX = centerX - moveProgressModifier
+  -- elseif (tankCtx.direction == tankDirections.right) then
+  --   centerX = centerX + moveProgressModifier
+  -- elseif (tankCtx.direction == tankDirections.up) then
+  --   centerY = centerY - moveProgressModifier
+  -- elseif (tankCtx.direction == tankDirections.down) then
+  --   centerY = centerY + moveProgressModifier
+  -- end
+
+  local img = images[tank:getImageId()]
+  local imgWidth = img:getWidth()
+  local imgHeight = img:getHeight()
+
+  love.graphics.draw(img, centerX, centerY, angle, 1,1,
+                     imgWidth/2, imgHeight/2) 
+end
+
+
 local function drawBullets(gameCtx)
   for i=1, #gameCtx.bullets do
     local cx = gameCtx.bullets[i].cellX
@@ -244,33 +270,6 @@ local function drawBullets(gameCtx)
                        tankDirectionAngles[gameCtx.bullets[i].direction], 1,1, 
                        imgWidth/2, imgHeight/2)
   end
-end
-
-local function drawTank(gameCtx, tankCtx)  
-  local angle = tankDirectionAngles[tankCtx.direction]
-
-  local centerX = gameCtx.gameAreaX
-  centerX = centerX + (tankCtx.cellX-1)*gameCtx.cellSize + gameCtx.cellSize/2
-
-  local centerY = gameCtx.gameAreaY
-  centerY = centerY + (tankCtx.cellY-1)*gameCtx.cellSize + gameCtx.cellSize/2
-
-  local moveProgressModifier = (tankCtx.moveProgress*gameCtx.cellSize)
-  if (tankCtx.direction == tankDirections.left) then
-    centerX = centerX - moveProgressModifier
-  elseif (tankCtx.direction == tankDirections.right) then
-    centerX = centerX + moveProgressModifier
-  elseif (tankCtx.direction == tankDirections.up) then
-    centerY = centerY - moveProgressModifier
-  elseif (tankCtx.direction == tankDirections.down) then
-    centerY = centerY + moveProgressModifier
-  end
-
-  local imgWidth = gameCtx.images.tank:getWidth()
-  local imgHeight = gameCtx.images.tank:getHeight()
-
-  love.graphics.draw(gameCtx.images.tank, centerX, centerY, angle, 1,1,
-                     imgWidth/2, imgHeight/2) 
 end
 
 local function drawOneEnemy(gameCtx, tankCtx)
@@ -312,7 +311,7 @@ function TanksGame:drawSelf()
   drawBackground(self.images[5])
   drawWalls(self.images, self.walls)
 
-  -- drawTank(self, self.playerTank)
+  drawTank(self.images, self.playerTank)
   -- drawEnemies(self, self.enemies)
 
   -- drawBullets(self)
@@ -532,7 +531,7 @@ end
 
 -- ===========================================================================
 
-local moveKeysProcessors = {processMoveUp, processMoveDown, processMoveLeft, processMoveRight }
+--local moveKeysProcessors = {processMoveUp, processMoveDown, processMoveLeft, processMoveRight }
 local moveKeys = {keyBindings.up, keyBindings.down, keyBindings.left, keyBindings.right }
 
 function TanksGame:processKeyPressed(key)
@@ -546,12 +545,13 @@ function TanksGame:processKeyPressed(key)
     return
   end
 
-  -- for i=1, #moveKeys do
-  --   if (moveKeys[i] == key) then
-  --     moveKeysProcessors[i](self.playerTank, self.map)
-  --     return
-  --   end
-  -- end
+  for i=1, #moveKeys do
+    if (moveKeys[i] == key) then
+      -- moveKeysProcessors[i](self.playerTank, self.map)
+      self.playerTank:processMoveRequest(key, self.walls)
+      return
+    end
+  end
 
   -- if (key == keyBindings.fire) then
   --   LL.trace("Firing")
@@ -835,6 +835,8 @@ function TanksGame:processUpdate(diffTime)
     return;
   end
   -- else
+
+  self.playerTank:processUpdate(diffTime)
 
   -- TimerKnife.update(diffTime)
 
