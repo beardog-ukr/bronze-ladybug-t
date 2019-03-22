@@ -1,7 +1,5 @@
 local LL = require '../thirdparty/log_lua/log'
 
-local TimerKnife = require '../thirdparty/knife.timer'
-
 require "src/basic_game_object"
 PlayerTankObject = BasicGameObject:extend()
 
@@ -23,7 +21,6 @@ keyBindings.up = "up"
 keyBindings.down = "down"
 keyBindings.left = "left"
 keyBindings.right = "right"
-keyBindings.fire = "space"
 
 -- ===========================================================================
 
@@ -37,6 +34,10 @@ end
 
 function PlayerTankObject:getAngle()
   return tankDirectionAngles[self.direction]
+end
+
+function PlayerTankObject:getDirection()
+  return self.direction
 end
 
 function PlayerTankObject:getDrawCoordinates()
@@ -116,8 +117,4 @@ function PlayerTankObject:processMoveRequest(key, walls)
   TimerKnife.tween(2,
                    { [self] = { moveProgress = 1 } }):finish(postTankMove)
 
-end
-
-function PlayerTankObject:processUpdate(diffTime)
-  TimerKnife.update(diffTime)
 end

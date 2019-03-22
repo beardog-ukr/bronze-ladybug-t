@@ -1,12 +1,13 @@
 local LL = require '../thirdparty/log_lua/log'
 
 local BaseKnife = require '../thirdparty/knife.base'
-local TimerKnife = require '../thirdparty/knife.timer'
+TimerKnife = require '../thirdparty/knife.timer'
 
 TanksGame = BaseKnife:extend()
 
-require "src/wall_object"
+require "src/bullet_object"
 require "src/player_tank_object"
+require "src/wall_object"
 
 local settings_m = require("src/app_defaults")
 local appDef = {}
@@ -19,7 +20,6 @@ drawSettings.gameAreaX = appDef.largeFrameSize
 drawSettings.gameAreaY = appDef.largeFrameSize
 drawSettings.cellSize = appDef.cellSize
 drawSettings.cellsCount = 13
-
 
 local mapLegend = {}
 mapLegend.wall1 = "v"      -- wall with 1 stength level
@@ -142,14 +142,14 @@ function TanksGame:constructor(offsetX, offsetY, areaWidth, areaHeight)
 
   self.gameFinished = false
 
-  local tankX = 5
-  local tankY = 8
+  local tankX = 3
+  local tankY = 6
   self.playerTank = PlayerTankObject(tankX, tankY)
 
   -- self.enemies = {}
   -- setupEnemies(self.enemies, self.map)
 
-  -- self.bullets = {}
+  self.bullets = {}
 
   self.images = {}
   self.images[1] = love.graphics.newImage("res/img/wall01.png")
@@ -158,7 +158,8 @@ function TanksGame:constructor(offsetX, offsetY, areaWidth, areaHeight)
 
   self.images[10] = love.graphics.newImage("res/img/tank01.png")
 
-  -- self.images.bullet = love.graphics.newImage("res/img/bullet01.png")
+  self.images[20] = love.graphics.newImage("res/img/bullet01.png")
+
   -- self.images.ground = love.graphics.newImage("res/img/ground01.png")
   -- self.images.tank = love.graphics.newImage("res/img/tank01.png")
   
@@ -207,56 +208,92 @@ local function drawWalls(images, walls)
   end
 end
 
-local function drawTank(images, tank)  
-  local angle = tank:getAngle()
-  local tx, ty = tank:getDrawCoordinates()
+-- local function drawTank(images, tank)  
+--   local angle = tank:getAngle()
+--   local tx, ty = tank:getDrawCoordinates()
+
+--   local centerX = drawSettings.gameAreaX
+--   centerX = centerX + (tx-1)*drawSettings.cellSize + drawSettings.cellSize/2
+
+--   local centerY = drawSettings.gameAreaY
+--   centerY = centerY + (ty-1)*drawSettings.cellSize + drawSettings.cellSize/2
+
+--   local img = images[tank:getImageId()]
+--   local imgWidth = img:getWidth()
+--   local imgHeight = img:getHeight()
+
+--   love.graphics.draw(img, centerX, centerY, angle, 1,1,
+--                      imgWidth/2, imgHeight/2)
+-- end
+
+local function drawOneItem(images, item)  
+  local angle = item:getAngle()
+  local cellX, cellY = item:getDrawCoordinates()
 
   local centerX = drawSettings.gameAreaX
-  centerX = centerX + (tx-1)*drawSettings.cellSize + drawSettings.cellSize/2
+  centerX = centerX + (cellX-1)*drawSettings.cellSize + drawSettings.cellSize/2
 
   local centerY = drawSettings.gameAreaY
-  centerY = centerY + (ty-1)*drawSettings.cellSize + drawSettings.cellSize/2
+  centerY = centerY + (cellY-1)*drawSettings.cellSize + drawSettings.cellSize/2
 
-  local img = images[tank:getImageId()]
+  local img = images[item:getImageId()]
   local imgWidth = img:getWidth()
   local imgHeight = img:getHeight()
 
   love.graphics.draw(img, centerX, centerY, angle, 1,1,
-                     imgWidth/2, imgHeight/2) 
+                     imgWidth/2, imgHeight/2)
 end
 
+local function drawBullets(images, bullets)
+  for i=1, #bullets do
+    if (bullets[i].enabled) then
+      drawOneItem(images, bullets[i])
+    -- local angle = bullets[i]:getAngle()
+    -- local bx, by = bullets[i]:getDrawCoordinates()
 
-local function drawBullets(gameCtx)
-  for i=1, #gameCtx.bullets do
-    local cx = gameCtx.bullets[i].cellX
-    if (gameCtx.bullets[i].cellX ~= gameCtx.bullets[i].finalX) then
-      local pm = (gameCtx.bullets[i].finalX - gameCtx.bullets[i].cellX) 
-      pm = pm * gameCtx.bullets[i].moveProgress
-      cx = cx + pm
+    -- local centerX = drawSettings.gameAreaX
+    -- centerX = centerX + (bx-1)*drawSettings.cellSize + drawSettings.cellSize/2
+
+    -- local centerY = drawSettings.gameAreaY
+    -- centerY = centerY + (by-1)*drawSettings.cellSize + drawSettings.cellSize/2
+
+    -- local img = images[bullets[i]:getImageId()]
+    -- local imgWidth = img:getWidth()
+    -- local imgHeight = img:getHeight()
+
+    -- love.graphics.draw(img, centerX, centerY, angle, 1,1,
+    --                    imgWidth/2, imgHeight/2) 
     end
-
-    local centerX = gameCtx.gameAreaX
-    centerX = centerX + (cx-1)*gameCtx.cellSize + gameCtx.cellSize/2
-
-    local cy = gameCtx.bullets[i].cellY
-    if (gameCtx.bullets[i].cellY ~= gameCtx.bullets[i].finalY) then
-      local pm = (gameCtx.bullets[i].finalY - gameCtx.bullets[i].cellY) 
-      pm = pm * gameCtx.bullets[i].moveProgress
-      cy = cy + pm
-    end
-
-    local centerY = gameCtx.gameAreaY
-    centerY = centerY + (cy-1)*gameCtx.cellSize + gameCtx.cellSize/2
-
-    local imgWidth = gameCtx.images.bullet:getWidth()
-    local imgHeight = gameCtx.images.bullet:getHeight()
-  
-    -- LL.trace("cx  is " .. cx .. " cy = " .. cy)
-
-    love.graphics.draw(gameCtx.images.bullet, centerX, centerY, 
-                       tankDirectionAngles[gameCtx.bullets[i].direction], 1,1, 
-                       imgWidth/2, imgHeight/2)
   end
+    -- local cx = gameCtx.bullets[i].cellX
+    -- if (gameCtx.bullets[i].cellX ~= gameCtx.bullets[i].finalX) then
+    --   local pm = (gameCtx.bullets[i].finalX - gameCtx.bullets[i].cellX) 
+    --   pm = pm * gameCtx.bullets[i].moveProgress
+    --   cx = cx + pm
+    -- end
+
+    -- local centerX = gameCtx.gameAreaX
+    -- centerX = centerX + (cx-1)*gameCtx.cellSize + gameCtx.cellSize/2
+
+    -- local cy = gameCtx.bullets[i].cellY
+    -- if (gameCtx.bullets[i].cellY ~= gameCtx.bullets[i].finalY) then
+    --   local pm = (gameCtx.bullets[i].finalY - gameCtx.bullets[i].cellY) 
+    --   pm = pm * gameCtx.bullets[i].moveProgress
+    --   cy = cy + pm
+    -- end
+
+    -- local centerY = gameCtx.gameAreaY
+    -- centerY = centerY + (cy-1)*gameCtx.cellSize + gameCtx.cellSize/2
+
+    -- local imgWidth = gameCtx.images.bullet:getWidth()
+    -- local imgHeight = gameCtx.images.bullet:getHeight()
+  
+    -- -- LL.trace("cx  is " .. cx .. " cy = " .. cy)
+
+    -- love.graphics.draw(gameCtx.images.bullet, centerX, centerY, 
+    --                    tankDirectionAngles[gameCtx.bullets[i].direction], 1,1, 
+    --                    imgWidth/2, imgHeight/2)
+  -- end
 end
 
 local function drawOneEnemy(gameCtx, tankCtx)
@@ -298,10 +335,10 @@ function TanksGame:drawSelf()
   drawBackground(self.images[5])
   drawWalls(self.images, self.walls)
 
-  drawTank(self.images, self.playerTank)
+  drawOneItem(self.images, self.playerTank)
   -- drawEnemies(self, self.enemies)
 
-  -- drawBullets(self)
+  drawBullets(self.images,self.bullets)
 end
 
 -- ===========================================================================
@@ -341,61 +378,61 @@ local function getActualTankCoordinates(itemCtx)
   return resultX, resultY
 end
 
-local function performFiring(bulletsArr, tankCtx)
-  --
-  local newBullet = {}
-  newBullet.moveProgress = 0
-  newBullet.triggered = false -- bullet will be "triggered" if it meets some obstacle
+-- local function performFiring(bulletsArr, tankCtx)
+--   --
+--   local newBullet = {}
+--   newBullet.moveProgress = 0
+--   newBullet.triggered = false -- bullet will be "triggered" if it meets some obstacle
 
-  local cx, cy = getActualTankCoordinates(tankCtx)
-  newBullet.cellX = cx
-  newBullet.cellY = cy
-  newBullet.finalX = cx
-  newBullet.finalY = cy
+--   local cx, cy = getActualTankCoordinates(tankCtx)
+--   newBullet.cellX = cx
+--   newBullet.cellY = cy
+--   newBullet.finalX = cx
+--   newBullet.finalY = cy
 
-  newBullet.direction = tankCtx.direction
+--   newBullet.direction = tankCtx.direction
 
-  if (newBullet.direction == tankDirections.up) then
-    newBullet.cellY = newBullet.cellY -1
-    newBullet.finalY = 1
-  elseif (newBullet.direction == tankDirections.down) then
-    newBullet.cellY = newBullet.cellY +1
-    newBullet.finalY = 13
-  elseif (newBullet.direction == tankDirections.left) then
-    newBullet.cellX = newBullet.cellX -1
-    newBullet.finalX = 1
-  elseif (newBullet.direction == tankDirections.right) then
-    newBullet.cellX = newBullet.cellX +1
-    newBullet.finalX = 13
-  end
+--   if (newBullet.direction == tankDirections.up) then
+--     newBullet.cellY = newBullet.cellY -1
+--     newBullet.finalY = 1
+--   elseif (newBullet.direction == tankDirections.down) then
+--     newBullet.cellY = newBullet.cellY +1
+--     newBullet.finalY = 13
+--   elseif (newBullet.direction == tankDirections.left) then
+--     newBullet.cellX = newBullet.cellX -1
+--     newBullet.finalX = 1
+--   elseif (newBullet.direction == tankDirections.right) then
+--     newBullet.cellX = newBullet.cellX +1
+--     newBullet.finalX = 13
+--   end
 
-  if (newBullet.cellX <1) or (newBullet.cellX>13) or 
-     (newBullet.cellY <1) or (newBullet.cellY>13) then
-    LL.warn("No shooting at direction " .. newBullet.direction)
-    return
-  end
+--   if (newBullet.cellX <1) or (newBullet.cellX>13) or 
+--      (newBullet.cellY <1) or (newBullet.cellY>13) then
+--     LL.warn("No shooting at direction " .. newBullet.direction)
+--     return
+--   end
 
-  local flightLength = 0
-  if (newBullet.cellX ~= newBullet.finalX) then
-    flightLength = delays.bullet* math.abs(newBullet.finalX - newBullet.cellX)
-  elseif (newBullet.cellY ~= newBullet.finalY) then
-    flightLength = delays.bullet* math.abs(newBullet.finalY - newBullet.cellY)
-  end
+--   local flightLength = 0
+--   if (newBullet.cellX ~= newBullet.finalX) then
+--     flightLength = delays.bullet* math.abs(newBullet.finalX - newBullet.cellX)
+--   elseif (newBullet.cellY ~= newBullet.finalY) then
+--     flightLength = delays.bullet* math.abs(newBullet.finalY - newBullet.cellY)
+--   end
   
-  if (flightLength>0) then
-    newBullet.moveTween = TimerKnife.tween(flightLength, 
-                                           { [newBullet] = { moveProgress = 1 } });
-  else
-    newBullet.moveTween = nil
-    newBullet.moveProgress = 1
-    LL.trace("Bullet already at the edge")
-  end
+--   if (flightLength>0) then
+--     newBullet.moveTween = TimerKnife.tween(flightLength, 
+--                                            { [newBullet] = { moveProgress = 1 } });
+--   else
+--     newBullet.moveTween = nil
+--     newBullet.moveProgress = 1
+--     LL.trace("Bullet already at the edge")
+--   end
 
-  -- gameCtx.bullets[#gameCtx.bullets+1] = newBullet
-  bulletsArr[#bulletsArr +1] = newBullet
+--   -- gameCtx.bullets[#gameCtx.bullets+1] = newBullet
+--   bulletsArr[#bulletsArr +1] = newBullet
 
-  LL.trace("Firing done")
-end
+--   LL.trace("Firing done")
+-- end
 
 -- ===========================================================================
 
@@ -421,10 +458,13 @@ function TanksGame:processKeyPressed(key)
     end
   end
 
-  -- if (key == keyBindings.fire) then
-  --   LL.trace("Firing")
-  --   performFiring(self.bullets, self.playerTank)
-  -- end
+  if (key == keyBindings.fire) then
+    LL.trace("Firing")
+    local tx, ty = self.playerTank:getCellCoordinates()
+    local dr = self.playerTank:getDirection()
+    self.bullets[#self.bullets+1] = BulletObject(tx,ty, dr)
+    -- performFiring(self.bullets, self.playerTank)
+  end
 
 end
 
@@ -704,9 +744,10 @@ function TanksGame:processUpdate(diffTime)
   end
   -- else
 
-  self.playerTank:processUpdate(diffTime)
+  -- self.playerTank:processUpdate(diffTime)
 
-  -- TimerKnife.update(diffTime)
+  -- BulletObject.processUpdate(diffTime)
+  TimerKnife.update(diffTime)
 
   -- setupEnemyMoves(self.map, self.playerTank, self.enemies, self.bullets)
 
