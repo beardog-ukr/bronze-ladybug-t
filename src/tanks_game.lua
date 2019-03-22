@@ -41,34 +41,34 @@ delays.bullet = delays.move/2
 
 -- ===========================================================================
 
-function setupPlayerTank(ctx, map)
-  local startingPointFound = false
-  -- load position from map
-  for i=1, #map do
-    for j=1, #map[i] do
-      if map[i][j] == mapLegend.playerTank then
-        ctx.cellX = j
-        ctx.cellY = i
-        map[i][j] = mapLegend.space
-        startingPointFound = true
-        break
-      end
-    end
+-- function setupPlayerTank(ctx, map)
+--   local startingPointFound = false
+--   -- load position from map
+--   for i=1, #map do
+--     for j=1, #map[i] do
+--       if map[i][j] == mapLegend.playerTank then
+--         ctx.cellX = j
+--         ctx.cellY = i
+--         map[i][j] = mapLegend.space
+--         startingPointFound = true
+--         break
+--       end
+--     end
 
-    if (startingPointFound) then
-      break
-    end
-  end
+--     if (startingPointFound) then
+--       break
+--     end
+--   end
 
-  if (startingPointFound ==false) then
-    LL.warn("Will use default values for player start position")
-    ctx.cellX =3 
-    ctx.cellY =6
-  end
+--   if (startingPointFound ==false) then
+--     LL.warn("Will use default values for player start position")
+--     ctx.cellX =3 
+--     ctx.cellY =6
+--   end
 
-  ctx.direction = tankDirections.down
-  ctx.moveProgress = 0
-end
+--   ctx.direction = tankDirections.down
+--   ctx.moveProgress = 0
+-- end
 
 -- ===========================================================================
 
@@ -145,7 +145,6 @@ function TanksGame:constructor(offsetX, offsetY, areaWidth, areaHeight)
   local tankX = 5
   local tankY = 8
   self.playerTank = PlayerTankObject(tankX, tankY)
-  -- setupPlayerTank(self.playerTank, self.map)
 
   -- self.enemies = {}
   -- setupEnemies(self.enemies, self.map)
@@ -211,24 +210,12 @@ end
 local function drawTank(images, tank)  
   local angle = tank:getAngle()
   local tx, ty = tank:getDrawCoordinates()
-   
 
   local centerX = drawSettings.gameAreaX
   centerX = centerX + (tx-1)*drawSettings.cellSize + drawSettings.cellSize/2
 
   local centerY = drawSettings.gameAreaY
   centerY = centerY + (ty-1)*drawSettings.cellSize + drawSettings.cellSize/2
-
-  -- local moveProgressModifier = (tankCtx.moveProgress*gameCtx.cellSize)
-  -- if (tankCtx.direction == tankDirections.left) then
-  --   centerX = centerX - moveProgressModifier
-  -- elseif (tankCtx.direction == tankDirections.right) then
-  --   centerX = centerX + moveProgressModifier
-  -- elseif (tankCtx.direction == tankDirections.up) then
-  --   centerY = centerY - moveProgressModifier
-  -- elseif (tankCtx.direction == tankDirections.down) then
-  --   centerY = centerY + moveProgressModifier
-  -- end
 
   local img = images[tank:getImageId()]
   local imgWidth = img:getWidth()
@@ -315,125 +302,6 @@ function TanksGame:drawSelf()
   -- drawEnemies(self, self.enemies)
 
   -- drawBullets(self)
-end
-
--- ===========================================================================
-
-local function processMoveUp(tankCtx, walls)
-  LL.debug("Like moving up (north)")
-
-  if (tankCtx.moveProgress > 0.05) then
-    LL.warn("Move in progress, skip moving up (north)")
-    return
-  end
-
-  if (tankCtx.cellY == 1) then
-    LL.debug("Already at max north")
-    return
-  end
-
-  if (walls[tankCtx.cellY-1][tankCtx.cellX] ~= mapLegend.space) then
-    LL.debug("Wall at north, no way")
-    return
-  end
-
-  local function postUpMove()
-    LL.debug("One move to north finished")
-    tankCtx.moveProgress=0    
-    tankCtx.cellY = tankCtx.cellY -1
-  end
-
-  tankCtx.direction = tankDirections.up
-  TimerKnife.tween(delays.move, 
-                   { [tankCtx] = { moveProgress = 1 } }):finish(postUpMove) 
-end
-
-local function processMoveDown(tankCtx, walls)
-  LL.debug("Like moving down")
-
-  if (tankCtx.moveProgress > 0.05) then
-    LL.warn("Move in progress, skip moving down (south)")
-    return
-  end
-
-  if (tankCtx.cellY == 13) then -- TODO: use game ctx const
-    LL.debug("Already at max south")
-    return
-  end
-
-  if (walls[tankCtx.cellY+1][tankCtx.cellX] ~= mapLegend.space) then
-    LL.debug("Wall at south, no way")
-    return
-  end
-
-  local function postDownMove()
-    LL.debug("One move to south finished")
-    tankCtx.moveProgress=0    
-    tankCtx.cellY = tankCtx.cellY +1
-  end
-
-  tankCtx.direction = tankDirections.down
-  TimerKnife.tween(delays.move, 
-                   { [tankCtx] = { moveProgress = 1 } }):finish(postDownMove) 
-end
-
-local function processMoveLeft(tankCtx, walls)
-  LL.debug("Like moving left (west)")
-
-  if (tankCtx.moveProgress > 0.05) then
-    LL.warn("Move in progress, skip moving left")
-    return
-  end
-
-  if (tankCtx.cellX == 1) then
-    LL.debug("Already at max west")
-    return
-  end
-
-  if (walls[tankCtx.cellY][tankCtx.cellX-1] ~= mapLegend.space) then
-    LL.debug("Wall at west, no way left")
-    return
-  end
-
-  local function postLeftMove()
-    LL.debug("One move to north finished")
-    tankCtx.moveProgress=0    
-    tankCtx.cellX = tankCtx.cellX -1
-  end
-
-  tankCtx.direction = tankDirections.left
-  TimerKnife.tween(delays.move, 
-                   { [tankCtx] = { moveProgress = 1 } }):finish(postLeftMove) 
-
-end
-
-local function processMoveRight(tankCtx, walls)
-  LL.debug("Like moving right (east)")
-
-  if (tankCtx.moveProgress > 0.05) then
-    LL.warn("Move in progress, skip moving right")
-    return
-  end
-
-  if (tankCtx.cellX == 13) then
-    LL.debug("Already at max east")
-    return
-  end
-
-  if (walls[tankCtx.cellY][tankCtx.cellX+1] ~= mapLegend.space) then
-    LL.debug("Wall at east, no way to right")
-    return
-  end
-
-  local function postRightMove()
-    LL.debug("One move to east finished")
-    tankCtx.moveProgress=0    
-    tankCtx.cellX = tankCtx.cellX +1
-  end
-
-  tankCtx.direction = tankDirections.right
-  TimerKnife.tween(delays.move, 
-                   { [tankCtx] = { moveProgress = 1 } }):finish(postRightMove) 
 end
 
 -- ===========================================================================
