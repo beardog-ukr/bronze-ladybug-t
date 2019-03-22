@@ -177,24 +177,6 @@ local function drawWalls(images, walls)
   end
 end
 
--- local function drawTank(images, tank)  
---   local angle = tank:getAngle()
---   local tx, ty = tank:getDrawCoordinates()
-
---   local centerX = drawSettings.gameAreaX
---   centerX = centerX + (tx-1)*drawSettings.cellSize + drawSettings.cellSize/2
-
---   local centerY = drawSettings.gameAreaY
---   centerY = centerY + (ty-1)*drawSettings.cellSize + drawSettings.cellSize/2
-
---   local img = images[tank:getImageId()]
---   local imgWidth = img:getWidth()
---   local imgHeight = img:getHeight()
-
---   love.graphics.draw(img, centerX, centerY, angle, 1,1,
---                      imgWidth/2, imgHeight/2)
--- end
-
 local function drawOneItem(images, item)  
   local angle = item:getAngle()
   local cellX, cellY = item:getDrawCoordinates()
@@ -305,7 +287,6 @@ end
 
 -- ===========================================================================
 
---local moveKeysProcessors = {processMoveUp, processMoveDown, processMoveLeft, processMoveRight }
 local moveKeys = {keyBindings.up, keyBindings.down, keyBindings.left, keyBindings.right }
 
 function TanksGame:processKeyPressed(key)
@@ -327,9 +308,9 @@ function TanksGame:processKeyPressed(key)
     end
   end
 
-  if (key == keyBindings.fire) then
-    LL.trace("Firing")
+  if (key == keyBindings.fire) then    
     local tx, ty = self.playerTank:getCellCoordinates()
+    LL.trace("Firing at " .. tx .. ":" .. ty )
     local dr = self.playerTank:getDirection()
     self.bullets[#self.bullets+1] = BulletObject(tx,ty, dr)
   end
@@ -409,88 +390,63 @@ local function getActualBulletCoordinates(itemCtx)
   return resultX, resultY
 end
 
-local function processConflictsBulletsVsWalls(mapArr, bulletsArr)
-  for i=1,#bulletsArr do
-    -- check one bullet
-    local cx, cy = getActualBulletCoordinates(bulletsArr[i])
-    if (cx < 1) or (cx > 13) or (cy < 1) or (cy > 13) then
-      LL.error("Bad cx or cy calculated: " .. cx .. " ; " .. cy)
-      return
-    end
+-- ===========================================================================
 
-    if (mapArr[cy][cx] ~= mapLegend.space) then
-      LL.debug("Conflict detected: " .. cx .. " ; " .. cy)
+-- returns true if conflict should be processed by other side
+--         false othervice (referenced object aleady disabled)
+local function triggerConflictProcessing(id, playerTank, walls)
+  if (playerTank.gameId == id) then
+    playerTank:processConflict();    
+    return true
+  end
 
-      bulletsArr[i].triggered = true
-      if (mapArr[cy][cx] == mapLegend.wall1) then
-        mapArr[cy][cx] = mapLegend.space
-      elseif (mapArr[cy][cx] == mapLegend.wall2) then
-        mapArr[cy][cx] = mapLegend.wall1
-      else
-        LL.error("Bad map value detected: " .. mapArr[cy][cx])
+  for i=1, #walls do
+    if (walls[i].gameId == id) then
+      if (walls[i].enabled ==false) then
+        return false ; -- wall already destroyed by something
       end
 
+      walls[i]:processConflict()
+      return true
     end
   end
+
+  return true
 end
 
--- ===========================================================================
+local function processAllConflicts(playerTank, walls, bullets)
+  local map = {}
 
--- returns true if conflict detected (game should be over with it)
---         false othervice
-local function processConflictsTankVsEnemies(tankCtx, enemiesArr)
-  local result = false
-  local tx, ty = getActualTankCoordinates(tankCtx)
-  for i=1,#enemiesArr do
-    local ex, ey = getActualTankCoordinates(enemiesArr[i])
-    if (ex == tx) and (ey == ty) then
-      result = true
-      LL.debug("found conflict at " .. ex .. ":" .. ey)
-      break;
+  for i=1,drawSettings.cellsCount do
+    map[i] = {}
+    for j=1,drawSettings.cellsCount do
+      map[i][j] = 0
     end
   end
 
-  return result
-end
-
-local function processConflictsBulletsVsEnemies(bulletsArr, enemiesArr)
-  for i=1,#bulletsArr do
-    local bx, by = getActualBulletCoordinates(bulletsArr[i])
-
-    for j=1,#enemiesArr do
-      local ex,ey = getActualTankCoordinates(enemiesArr[j])
-
-      if (bx == ex) and (by == ey) then
-        LL.debug("Killing some: " .. ex .. " ; " .. ey)
-        bulletsArr[i].triggered = true
-        enemiesArr[j].disabled = true
-        break
-      end  
-    end
-
+  if (playerTank.enabled == true) then
+    local cx,cy = playerTank:getCellCoordinates()
+    map[cx][cy] = playerTank.gameId
   end
-end
 
--- ===========================================================================
-
--- returns true if one of the byllets hits player tank
---         false othervice
-local function processConflictsBulletsVsPlayer(bulletsArr, tankCtx)
-  local result = false
-
-  local tx,ty = getActualTankCoordinates(tankCtx)
-
-  for i=1,#bulletsArr do
-    local bx, by = getActualBulletCoordinates(bulletsArr[i])
-
-    if (bx == tx) and (by == ty) then
-      result = true
-      bulletsArr[i].triggered = true
-      break
+  for i=1, #walls do
+    if (walls[i].enabled == true) then
+      local cx,cy = walls[i]:getCellCoordinates()
+      map[cx][cy] = walls[i].gameId
     end
   end
 
-  return result
+  for i=1, #bullets do
+    if (bullets[i].enabled == true) then
+      local cx,cy = bullets[i]:getCellCoordinates()
+      if (map[cx][cy] ~= 0) then        
+        local osnp = triggerConflictProcessing(map[cx][cy], playerTank, walls)
+        if (osnp == true) then --  if other side needs processing
+          bullets[i]:processConflict()
+        end
+      end
+    end
+  end
 end
 
 -- ===========================================================================
@@ -612,32 +568,15 @@ function TanksGame:processUpdate(diffTime)
   end
   -- else
 
-  -- self.playerTank:processUpdate(diffTime)
-
-  -- BulletObject.processUpdate(diffTime)
   TimerKnife.update(diffTime)
 
   -- setupEnemyMoves(self.map, self.playerTank, self.enemies, self.bullets)
 
   -- conflicts processing
-  -- self.gameFinished = processConflictsTankVsEnemies(self.playerTank, self.enemies)
-  -- if (self.gameFinished) then
-  --   LL.debug("hahah, game over")
-  --   return
-  -- end
-
-  -- self.gameFinished = processConflictsBulletsVsPlayer(self.bullets, self.playerTank)
-  -- if (self.gameFinished) then
-  --   cleanupBulletsArray(self.bullets)
-  --   LL.debug("hahah, game over, player killed")
-  --   return
-  -- end  
-
-  -- processConflictsBulletsVsEnemies(self.bullets, self.enemies)
-  -- cleanupBulletsArray(self.bullets)
-  -- cleanupEnemiesArray(self.enemies)
-
-  -- processConflictsBulletsVsWalls(self.map, self.bullets)
-  -- cleanupBulletsArray(self.bullets)
-
+  processAllConflicts(self.playerTank, self.walls, self.bullets)
+  if (self.playerTank.enabled == false) then
+    self.gameFinished = true
+    LL.debug("hahah, game over")
+    return
+  end
 end

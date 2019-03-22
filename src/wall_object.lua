@@ -27,3 +27,12 @@ function WallObject:getImageId()
   end
 end
 
+function WallObject:processConflict()
+  LL.debug("Something hits wall #" .. self.gameId)
+  self.strength = self.strength -1
+
+  if (self.strength <=0) then
+    self.enabled = false
+  end
+end
+

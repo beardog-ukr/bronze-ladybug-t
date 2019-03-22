@@ -40,6 +40,13 @@ function PlayerTankObject:getDirection()
   return self.direction
 end
 
+function PlayerTankObject:getCellCoordinates()  
+  local resultX, resultY = self:getDrawCoordinates()
+  resultX = math.floor(resultX + 0.5)
+  resultY = math.floor(resultY + 0.5)
+  return resultX, resultY
+end
+
 function PlayerTankObject:getDrawCoordinates()
   local resultX = self.baseX
   local resultY = self.baseY
@@ -95,7 +102,7 @@ function PlayerTankObject:processMoveRequest(key, walls)
 
   for i=1,#walls do
     local wx, wy = walls[i]:getCellCoordinates()
-    if (wx == newBaseX) and (wy == newBaseY) then
+    if (wx == newBaseX) and (wy == newBaseY) and (walls[i].enabled == true) then
       LL.warn("Found wall at " .. wx .. ":" .. wy .. ", no move")
       return
     end
@@ -118,3 +125,9 @@ function PlayerTankObject:processMoveRequest(key, walls)
                    { [self] = { moveProgress = 1 } }):finish(postTankMove)
 
 end
+
+function PlayerTankObject:processConflict()
+  LL.debug("Something hits player tank #" .. self.gameId)
+  self.enabled = false
+end
+

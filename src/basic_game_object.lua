@@ -6,11 +6,22 @@ BasicGameObject = BaseKnife:extend()
 
 -- ===========================================================================
 
+local idGenerator = 1
+
+local function getNewId()
+  idGenerator = idGenerator +1
+  return idGenerator
+end
+
+-- ===========================================================================
+
 function BasicGameObject:constructor(x,y)
   -- print("Basic obj constructor: " .. x .. ":" .. y)
   self.baseX = x
   self.baseY = y
   self.enabled = true
+
+  self.gameId = getNewId()
 end
 
 function BasicGameObject:getAngle()
@@ -34,5 +45,9 @@ end
 -- will be implemented in subclasses
 function BasicGameObject:getImageId()
   return nil
+end
+
+function BasicGameObject:processConflict()  
+  self.enabled = false
 end
 

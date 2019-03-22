@@ -27,6 +27,8 @@ function BulletObject:constructor(x,y, direction)
   self.baseY = y + directions.yModifier[direction]
 
 
+  LL.trace("Created bullet at " .. self.baseX .. ":" .. self.baseY )
+
   self.direction = direction
   self.moveProgress = 0
 
@@ -81,6 +83,13 @@ end
 
 function BulletObject:getImageId()
   return 20
+end
+
+function BulletObject:getCellCoordinates()  
+  local resultX, resultY = self:getDrawCoordinates()
+  resultX = math.floor(resultX + 0.5)
+  resultY = math.floor(resultY + 0.5)
+  return resultX, resultY
 end
 
 -- ===========================================================================
